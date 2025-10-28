@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Taschenrechner</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #f5f6fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .calculator {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            width: 320px;
+        }
+        .display {
+            background: #f1f2f6;
+            border-radius: 10px;
+            padding: 10px;
+            text-align: right;
+            min-height: 60px;
+            word-wrap: break-word;
+            margin-bottom: 15px;
+        }
+        .display .expr {
+            font-size: 14px;
+            color: #888;
+        }
+        .display .result {
+            font-size: 24px;
+            font-weight: bold;
+            color: #000;
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        button {
+            font-size: 18px;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #f0f0f0;
+        }
+        button.op {
+            background: #dfe4ea;
+            font-weight: bold;
+        }
+        button.equal {
+            background: #4c6ef5;
+            color: white;
+            font-weight: bold;
+        }
+        .history {
+            margin-top: 15px;
+            font-size: 14px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .history-entry {
+            display: flex;
+            justify-content: space-between;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 5px 8px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+<div class="calculator">
+    <div class="display">
+        <div class="expr" id="expr">0</div>
+        <div class="result" id="result">&nbsp;</div>
+    </div>
+    <div class="buttons">
+        <button class="op" data-action="all-clear">AC</button>
+        <button class="op" data-action="clear">C</button>
+        <button class="op">%</button>
+        <button class="op">÷</button>
+        <button>7</button><button>8</button><button>9</button><button class="op">×</button>
+        <button>4</button><button>5</button><button>6</button><button class="op">-</button>
+        <button>1</button><button>2</button><button>3</button><button class="op">+</button>
+        <button>(</button><button>0</button><button>.</button><button class="equal">=</button>
+    </div>
+    <div class="history" id="history"></div>
+</div>
+<script>
+    const exprEl = document.getElementById('expr');
+    const resultEl = document.getElementById('result');
+    const historyEl = document.getElementById('history');
+
+    let expr = '';
+    let history = [];
+
+    function updateDisplay() {
+        exprEl.textContent = expr || '0';
+    }
+
+    function safeEvaluate(input) {
+        const normalized = input.replace(/×/g, '*').replace(/÷/g, '/').replace(/,/g, '.').trim();
+        if (!/^[0-9+\-*/().%\s]+$/.test(normalized)) throw new Error('Ungültige Zeichen');
+        const withPercent = normalized.replace(/(\d+(?:\.\d+)?)%/g, '($1/100)');
+        const fn = new Function(`'use strict'; return (${withPercent});`);
+        return fn();
+    }
+
+    function calculate() {
+        if (!expr) return;
+        try {
+            const res = safeEvaluate(expr);
+            if (!isFinite(res)) throw new Error();
+            const rounded = Math.round((res + Number.EPSILON) * 1e12) / 1e12;
+            resultEl.textContent = rounded;
+            history.unshift({ expr, result: rounded });
+            renderHistory();
+            expr = String(rounded);
+        } catch {
+            resultEl.textContent = 'Fehler';
+        }
+    }
+
+    function renderHistory() {
+        historyEl.innerHTML = history.slice(0, 10).map(
+            h => `<div class="history-entry"><span>${h.expr}</span><span>${h.result}</span></div>`
+        ).join('');
+    }
+
+
+    document.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            const value = btn.textContent.trim();
+
+            if (action === 'all-clear') {
+                expr = '';
+                resultEl.textContent = '';
+                history = [];
+                renderHistory();
+            } else if (action === 'clear') {
+                expr = expr.slice(0, -1);
+            } else if (value === '=') {
+                calculate();
+                return;
+            } else if (value === '÷') expr += '/';
+            else if (value === '×') expr += '*';
+            else expr += value;  // normale Zahlen und Zeichen werden hier hinzugefügt
+
+            updateDisplay();
+        });
+    });
+
+
+    document.addEventListener('keydown', (e) => {
+        const key = e.key;
+        if (/^[0-9]$/.test(key)) expr += key;
+        else if (['+', '-', '*', '/', '(', ')', '%', '.'].includes(key)) expr += key;
+        else if (key === 'Enter') { e.preventDefault(); calculate(); return; }
+        else if (key === 'Backspace') expr = expr.slice(0, -1);
+        else if (key === 'Escape') expr = '';
+
+        updateDisplay();
+    });
+
+    updateDisplay();
+</script>
+</body>
+</html>
